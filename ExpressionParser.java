@@ -3,31 +3,38 @@ import java.util.Map;
 
 public class ExpressionParser {
 
-    public double evaluate(String equation, String[] names, 
+    public double evaluate(String equation, String[] names,
                           double[] state, Map<String, Double> constants) {
+
+
         
-        // step 1: replace constants
+        // step 1: replace constants using whole word matching
         for (Map.Entry<String, Double> entry : constants.entrySet()) {
-            equation = equation.replace(entry.getKey(), 
-                                       String.valueOf(entry.getValue()));
+            equation = equation.replaceAll(
+                "(?<![a-zA-Z0-9.])" + entry.getKey() + "(?![a-zA-Z0-9.])",
+                String.valueOf(entry.getValue())
+            );
         }
-        
-        // step 2: replace variables
+
+        // step 2: replace variables using whole word matching
         for (int i = 0; i < names.length; i++) {
-            equation = equation.replace(names[i], 
-                                       String.valueOf(state[i]));
+            equation = equation.replaceAll(
+                "(?<![a-zA-Z0-9.])" + names[i] + "(?![a-zA-Z0-9.])",
+                String.valueOf(state[i])
+            );
         }
-        
+
         // step 3: remove all spaces
         equation = equation.replace(" ", "");
-        
+
+
         // step 4: calculate the result
         return calculate(equation);
     }
 
     private double calculate(String equation) {
+
         // handle + and - last (lowest priority)
-        // scan from right to left to handle left-to-right evaluation
         int depth = 0;
         for (int i = equation.length() - 1; i >= 0; i--) {
             char c = equation.charAt(i);
@@ -40,7 +47,10 @@ public class ExpressionParser {
             }
         }
 
-        // handle * and / first (higher priority)
+        // reset depth before second loop
+        depth = 0;
+
+        // handle * and / (higher priority)
         for (int i = equation.length() - 1; i >= 0; i--) {
             char c = equation.charAt(i);
             if (c == '(') depth++;

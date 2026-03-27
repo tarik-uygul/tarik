@@ -1,5 +1,11 @@
+package bin;
+
 import java.util.ArrayList;
 import java.util.List;
+
+import EulerSolver;
+import ODEFunction;
+import RungeKutta4;
 
 public class SolverAccuracyExperiment {
 

@@ -1,3 +1,5 @@
+package bin;
+
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -12,6 +14,11 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
 import java.util.HashMap;
+
+import EulerSolver;
+import ODEFunction;
+import ODESystemBuilder;
+import RungeKutta4;
 
 /**
  * SolverExperimentPlot

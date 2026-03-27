@@ -1,5 +1,8 @@
+package bin;
 import java.util.HashMap;
 import java.util.Map;
+
+import ODESystemBuilder;
 
 public class FakeGUI {
 

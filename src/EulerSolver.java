@@ -31,4 +31,5 @@ public class EulerSolver {
         // hand back the new state - the solver doesnt touch the original, always returns fresh array
         return nextState;
     }
+    //testing
 }

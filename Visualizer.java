@@ -44,16 +44,9 @@ public class Visualizer extends Application {
 
         confirmSetup.setOnAction(e -> {
 
-            // remove old screen 2 and chart if rerunning
             mainLayout.getChildren().removeIf(node -> node != screen1);
 
             int numVars = Integer.parseInt(numVarsField.getText());
-
-            // generate variable names x, y, z etc
-            String[] names = new String[numVars];
-            for (int i = 0; i < numVars; i++) {
-                names[i] = String.valueOf((char)('x' + i));
-            }
 
             // ---- SCREEN 2 ----
             GridPane screen2 = new GridPane();
@@ -62,18 +55,30 @@ public class Visualizer extends Application {
 
             int row = 0;
 
-            // equation boxes
+            // variable name input boxes
+            screen2.addRow(row++, new Label("--- Variable names ---"));
+            TextField[] nameFields = new TextField[numVars];
+            for (int i = 0; i < numVars; i++) {
+                nameFields[i] = new TextField("var" + (i + 1));
+                screen2.addRow(row++,
+                    new Label("Name for variable " + (i + 1) + ":"),
+                    nameFields[i]);
+            }
+
+            // equation input boxes
+            screen2.addRow(row++, new Label("--- Equations ---"));
             TextField[] equationFields = new TextField[numVars];
             for (int i = 0; i < numVars; i++) {
                 equationFields[i] = new TextField();
                 equationFields[i].setPrefWidth(300);
                 equationFields[i].setPromptText("e.g. a*x - b*x*y");
-                screen2.addRow(row++, 
-                    new Label("d" + names[i] + "/dt ="), equationFields[i]);
+                screen2.addRow(row++,
+                    new Label("d(var" + (i + 1) + ")/dt ="),
+                    equationFields[i]);
             }
 
             // constants
-            screen2.addRow(row++, new Label("Constants (name=value, one per line):"));
+            screen2.addRow(row++, new Label("--- Constants (name=value, one per line) ---"));
             TextArea constantsArea = new TextArea();
             constantsArea.setPromptText("a=0.25\nb=0.15\nd=0.10\ng=0.10");
             constantsArea.setPrefRowCount(4);
@@ -81,31 +86,34 @@ public class Visualizer extends Application {
             screen2.addRow(row++, constantsArea);
 
             // initial conditions
-            screen2.addRow(row++, new Label("Initial conditions:"));
+            screen2.addRow(row++, new Label("--- Initial conditions ---"));
             TextField[] initFields = new TextField[numVars];
             for (int i = 0; i < numVars; i++) {
                 initFields[i] = new TextField("1.0");
-                screen2.addRow(row++, 
-                    new Label(names[i] + "(0):"), initFields[i]);
+                screen2.addRow(row++,
+                    new Label("var" + (i + 1) + "(0):"),
+                    initFields[i]);
             }
 
             // time settings
+            screen2.addRow(row++, new Label("--- Time settings ---"));
             TextField timeStep = new TextField("0.1");
             TextField simDuration = new TextField("10");
-            screen2.addRow(row++, 
+            screen2.addRow(row++,
                 new Label("Step size:"), timeStep,
                 new Label("Total time:"), simDuration);
 
             // axis selectors
+            screen2.addRow(row++, new Label("--- Plot settings ---"));
             ComboBox<String> plotXAxis = new ComboBox<>();
             ComboBox<String> plotYAxis = new ComboBox<>();
             plotXAxis.getItems().add("t");
             for (int i = 0; i < numVars; i++) {
-                plotXAxis.getItems().add(names[i]);
-                plotYAxis.getItems().add(names[i]);
+                plotXAxis.getItems().add("var" + (i + 1));
+                plotYAxis.getItems().add("var" + (i + 1));
             }
             plotXAxis.setValue("t");
-            plotYAxis.setValue(names[0]);
+            plotYAxis.setValue("var1");
 
             screen2.addRow(row++,
                 new Label("X axis:"), plotXAxis,
@@ -120,13 +128,19 @@ public class Visualizer extends Application {
 
                 theChart.getData().clear();
 
+                // collect actual variable names from user input
+                String[] names = new String[numVars];
+                for (int i = 0; i < numVars; i++) {
+                    names[i] = nameFields[i].getText().trim();
+                }
+
                 // collect equations
                 String[] equations = new String[numVars];
                 for (int i = 0; i < numVars; i++) {
-                    equations[i] = equationFields[i].getText();
+                    equations[i] = equationFields[i].getText().trim();
                 }
 
-                // parse constants
+                // parse constants from text area
                 Map<String, Double> constants = new HashMap<>();
                 for (String line : constantsArea.getText().split("\n")) {
                     line = line.trim();
@@ -136,7 +150,7 @@ public class Visualizer extends Application {
                             constants.put(parts[0].trim(),
                                 Double.parseDouble(parts[1].trim()));
                         } catch (NumberFormatException ex) {
-                            System.out.println("bad constant line: " + line);
+                            System.out.println("bad constant: " + line);
                         }
                     }
                 }
@@ -144,13 +158,14 @@ public class Visualizer extends Application {
                 // collect initial conditions
                 double[] currentState = new double[numVars];
                 for (int i = 0; i < numVars; i++) {
-                    currentState[i] = Double.parseDouble(initFields[i].getText());
+                    currentState[i] = Double.parseDouble(
+                        initFields[i].getText().trim());
                 }
 
-                double dt = Double.parseDouble(timeStep.getText());
-                double totalTime = Double.parseDouble(simDuration.getText());
+                double dt = Double.parseDouble(timeStep.getText().trim());
+                double totalTime = Double.parseDouble(simDuration.getText().trim());
 
-                // build ODE system
+                // build ODE system with user provided names and equations
                 ODESystemBuilder ode = new ODESystemBuilder(equations, names, constants);
 
                 // run simulation
@@ -171,7 +186,7 @@ public class Visualizer extends Application {
                     currentTime += dt;
                 }
 
-                // plot
+                // figure out which variable index the user selected
                 String xChoice = plotXAxis.getValue();
                 String yChoice = plotYAxis.getValue();
 
@@ -182,8 +197,8 @@ public class Visualizer extends Application {
                     double[] snap = allStates.get(i);
                     double t = allTimes.get(i);
 
-                    double xVal = getVal(xChoice, snap, t, names);
-                    double yVal = getVal(yChoice, snap, t, names);
+                    double xVal = getVal(xChoice, snap, t, numVars);
+                    double yVal = getVal(yChoice, snap, t, numVars);
 
                     plotLine.getData().add(new XYChart.Data<>(xVal, yVal));
                 }
@@ -195,10 +210,11 @@ public class Visualizer extends Application {
         });
     }
 
-    private double getVal(String name, double[] state, double t, String[] names) {
+    // extracts value by var name like "var1", "var2", or "t"
+    private double getVal(String name, double[] state, double t, int numVars) {
         if (name.equals("t")) return t;
-        for (int i = 0; i < names.length; i++) {
-            if (name.equals(names[i])) return state[i];
+        for (int i = 0; i < numVars; i++) {
+            if (name.equals("var" + (i + 1))) return state[i];
         }
         return 0;
     }

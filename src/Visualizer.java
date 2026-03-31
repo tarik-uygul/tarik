@@ -1,213 +1,411 @@
-
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.chart.*;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-// this is the main class that actually runs and shows the window
-// it does three things:
-// 1. draws the input fields so you can set initial conditions (starting position, velocity etc)
-// 2. defines the physics as a lambda (the ODEFunction implementation)
-// 3. runs the simulation loop and plots the results
+// this is the main GUI window for the ODE simulator
+// it lets the user type in any ODE system as equation strings,
+// pick a solver, set step size and duration, then plots the result
 //
-// this class doesnt actually know anything about HOW euler or rk4 work
-// it just calls .step() on them and gets back a new state
-// euler and rk4 dont know anything about gravity or golf balls
-// all the physics knowledge is in the "system" lambda below
-
+// the GUI does three things:
+//   1. collects equation strings, variable names, constants, initial conditions
+//   2. builds an ODESystemBuilder from those inputs (which implements ODEFunction)
+//   3. runs the solver loop and plots whatever variables the user picks
+//
+// the solvers (euler and rk4) know nothing about what equations are being solved
+// the GUI knows nothing about how the solvers work
+// all the physics/math is in the equation strings the user types in
 public class Visualizer extends Application {
 
     @Override
     public void start(Stage primaryStage) {
 
-        // initial position inputs: 
-        // these are where the ball starts, in metres
-        // x and y are horizontal, z is height (up is positive)
-        TextField startX = new TextField("0");
-        TextField startY = new TextField("0");
-        TextField startZ = new TextField("0");
-
-        // initial velocity inputs:
-        // these are how fast the ball is moving at the start, in m/s
-        // vz of 10 means its going upward at 10 metres per second initially
-        TextField startVX = new TextField("10");
-        TextField startVY = new TextField("5");
-        TextField startVZ = new TextField("10");
-
-        // how big each time jump is
-        // 0.01 means were simulating in 0.01 second intervals
-        // making this smaller makes the simulation more accurate but takes longer to run
-        // making it bigger is faster but you lose accuracy, especially with euler
-        TextField timeStep = new TextField("0.01");
-
-        // how many seconds of flight to simulate total
-        TextField simDuration = new TextField("5");
-
-        // dropdown to pick which solver to use
-        // both euler and rk4 do the same job but rk4 is more accurate
-        // you can compare them by running with the same inputs and switching this
-        ComboBox<String> whichSolver = new ComboBox<>();
-        whichSolver.getItems().addAll("Euler", "RK4");
-        whichSolver.setValue("RK4");
-
-        // these let you pick what to plot on each axis
-        // default is time on x axis and height (z) on y axis
-        ComboBox<String> plotXAxis = new ComboBox<>();
-        ComboBox<String> plotYAxis = new ComboBox<>();
-
-        plotXAxis.getItems().addAll("t", "x", "y", "z", "vx", "vy", "vz");
-        plotYAxis.getItems().addAll("x", "y", "z", "vx", "vy", "vz");
-
-        plotXAxis.setValue("t");
-        plotYAxis.setValue("z");
-
-        // set up the chart - just a standard line chart with two number axes
         NumberAxis xAxisLabel = new NumberAxis();
         NumberAxis yAxisLabel = new NumberAxis();
         LineChart<Number, Number> theChart = new LineChart<>(xAxisLabel, yAxisLabel);
+        theChart.setAnimated(false);
 
-        // the motion of ball:
-        // this lambda is the actual implementation of ODEFunction
-        //
-        // the state array coming in looks like this:
-        //   state[0] = x position
-        //   state[1] = y position
-        //   state[2] = z position (height)
-        //   state[3] = vx (velocity in x direction)
-        //   state[4] = vy (velocity in y direction)
-        //   state[5] = vz (velocity in z direction, positive = going up)
-        //
-        // what we return is the derivative of each of those
-        // aka how fast each one is changing right now
-        //
-        // for position: the derivative of position is just velocity, thats literally the definition
-        // so derivative of x-position = vx, which is state[3]
-        //
-        // for velocity: the derivative of velocity is acceleration
-        // and acceleration = force / mass 
-        // right now the only force is gravity pulling down: -9.81 m/s^2
-        // later we could add drag and other forces
-        // and we wouldnt need to change the solvers
-        ODEFunction golfBallPhysics = (state) -> {
-            double[] derivatives = new double[state.length];
-
-            
-            derivatives[0] = state[3];   // dx/dt = vx
-            derivatives[1] = state[4];   // dy/dt = vy
-            derivatives[2] = state[5];   // dz/dt = vz
-
-           
-            derivatives[3] = 0;          // dvx/dt = 0 
-            derivatives[4] = 0;          // dvy/dt = 0 
-            derivatives[5] = -9.81;      // dvz/dt = -g (gravity always pulls down)
-
-            return derivatives;
-        };
-
-        Button goButton = new Button("Run Simulation");
-
-        goButton.setOnAction(e -> {
-
-            theChart.getData().clear();
-
-            // pack all the starting values into the state array
-            // order matters here - has to match what the lambda expects above
-            double[] currentState = {
-                Double.parseDouble(startX.getText()),
-                Double.parseDouble(startY.getText()),
-                Double.parseDouble(startZ.getText()),
-                Double.parseDouble(startVX.getText()),
-                Double.parseDouble(startVY.getText()),
-                Double.parseDouble(startVZ.getText())
-            };
-
-            double dt = Double.parseDouble(timeStep.getText());
-            double totalTime = Double.parseDouble(simDuration.getText());
-
-            // store every state point so we can plot them all afterwards
-            // we need the full history
-            List<double[]> allStates = new ArrayList<>();
-            List<Double> allTimes = new ArrayList<>();
-
-            double currentTime = 0;
-
-            //main loop: 
-            // each iteration of this loop represents one tiny slice of time (dt seconds)
-            // we record where things are, then advance the simulation forward by dt
-            // repeat until weve simulated the full duration
-            //
-            // note: we record before stepping, so we capture the initial state too
-            // note: we clone() the state when storing it because arrays are passed by reference
-            // if we didnt clone, every entry in allStates would point to the same array
-            // and theyd all show the final state which would make for a boring graph
-            while (currentTime <= totalTime) {
-
-                allStates.add(currentState.clone());  
-                allTimes.add(currentTime);
-
-                // ask whichever solver is selected to advance the state by one time step
-                // both solvers take exactly the same arguments and return the same thing
-                if (whichSolver.getValue().equals("Euler")) {
-                    currentState = EulerSolver.step(currentState, dt, golfBallPhysics);
-                } else {
-                    currentState = RungeKutta4.step(currentState, dt, golfBallPhysics);
-                }
-
-                currentTime += dt;
-            }
-
-            //plotting: 
-            // go through all the snapshots we recorded and pull out the two variables
-            // the user wants to see on the chart axes
-            // getValue() handles translating "z" into state[2] 
-            XYChart.Series<Number, Number> plotLine = new XYChart.Series<>();
-
-            for (int i = 0; i < allStates.size(); i++) {
-                double[] snap = allStates.get(i);
-
-                double xVal = extractVariable(plotXAxis.getValue(), snap, allTimes.get(i));
-                double yVal = extractVariable(plotYAxis.getValue(), snap, allTimes.get(i));
-
-                plotLine.getData().add(new XYChart.Data<>(xVal, yVal));
-            }
-
-            xAxisLabel.setLabel(plotXAxis.getValue());
-            yAxisLabel.setLabel(plotYAxis.getValue());
-            theChart.getData().add(plotLine);
-        });
-
-        // standard javafx layout, just arranging the inputs into a grid above the chart
-        GridPane inputGrid = new GridPane();
-        inputGrid.addRow(0, new Label("x0"), startX, new Label("y0"), startY, new Label("z0"), startZ);
-        inputGrid.addRow(1, new Label("vx0"), startVX, new Label("vy0"), startVY, new Label("vz0"), startVZ);
-        inputGrid.addRow(2, new Label("Step size"), timeStep, new Label("Total time"), simDuration);
-        inputGrid.addRow(3, new Label("Solver"), whichSolver);
-        inputGrid.addRow(4, new Label("X axis"), plotXAxis, new Label("Y axis"), plotYAxis);
-        inputGrid.add(goButton, 0, 5);
-
-        VBox mainLayout = new VBox(inputGrid, theChart);
-        Scene scene = new Scene(mainLayout, 900, 700);
+        VBox mainLayout = new VBox(10);
+        Scene scene = new Scene(new ScrollPane(mainLayout), 900, 700);
         primaryStage.setScene(scene);
-        primaryStage.setTitle("Golf Ball Simulator");
+        primaryStage.setTitle("ODE Simulator");
         primaryStage.show();
+
+        // ---- SCREEN 1: choose solver and number of variables ----
+        ComboBox<String> solverBox = new ComboBox<>();
+        solverBox.getItems().addAll("Euler", "RK4");
+        solverBox.setValue("Euler");
+
+        TextField numVarsField = new TextField("2");
+        Button confirmSetup = new Button("Next");
+
+        GridPane screen1 = new GridPane();
+        screen1.setHgap(8);
+        screen1.setVgap(8);
+        screen1.addRow(0, new Label("Choose solver:"), solverBox);
+        screen1.addRow(1, new Label("Number of variables:"), numVarsField);
+        screen1.add(confirmSetup, 0, 2);
+
+        mainLayout.getChildren().add(screen1);
+
+        confirmSetup.setOnAction(e -> {
+
+            mainLayout.getChildren().removeIf(node -> node != screen1);
+
+            int numVars;
+            try {
+                numVars = Integer.parseInt(numVarsField.getText().trim());
+            } catch (NumberFormatException ex) {
+                numVarsField.setText("2");
+                return;
+            }
+
+            // ---- SCREEN 2: enter equations, constants, initial conditions ----
+            GridPane screen2 = new GridPane();
+            screen2.setHgap(8);
+            screen2.setVgap(8);
+            int row = 0;
+
+            // variable name fields
+            screen2.addRow(row++, new Label("--- Variable names ---"));
+            TextField[] nameFields = new TextField[numVars];
+            for (int i = 0; i < numVars; i++) {
+                nameFields[i] = new TextField("var" + (i + 1));
+                screen2.addRow(row++,
+                    new Label("Name for variable " + (i + 1) + ":"),
+                    nameFields[i]);
+            }
+
+            // equation fields - user types the right-hand side of each d/dt equation
+            // supports basic arithmetic, ^ for powers, and sin/cos/sqrt/etc
+            // example: "a*x - b*x*y" for the first Lotka-Volterra equation
+            screen2.addRow(row++, new Label("--- Equations (type the right-hand side) ---"));
+            TextField[] equationFields = new TextField[numVars];
+            for (int i = 0; i < numVars; i++) {
+                equationFields[i] = new TextField();
+                equationFields[i].setPrefWidth(300);
+                equationFields[i].setPromptText("e.g. a*x - b*x*y");
+                screen2.addRow(row++,
+                    new Label("d(var" + (i + 1) + ")/dt ="),
+                    equationFields[i]);
+            }
+
+            // constants - one per line in "name=value" format
+            screen2.addRow(row++, new Label("--- Constants (name=value, one per line) ---"));
+            TextArea constantsArea = new TextArea();
+            constantsArea.setPromptText("a=0.25\nb=0.15\nd=0.10\ng=0.10");
+            constantsArea.setPrefRowCount(4);
+            constantsArea.setPrefWidth(300);
+            screen2.addRow(row++, constantsArea);
+
+            // initial conditions
+            screen2.addRow(row++, new Label("--- Initial conditions ---"));
+            TextField[] initFields = new TextField[numVars];
+            for (int i = 0; i < numVars; i++) {
+                initFields[i] = new TextField("1.0");
+                screen2.addRow(row++,
+                    new Label("var" + (i + 1) + "(0):"),
+                    initFields[i]);
+            }
+
+            // time settings
+            screen2.addRow(row++, new Label("--- Time settings ---"));
+            TextField timeStep = new TextField("0.1");
+            TextField simDuration = new TextField("10");
+            screen2.addRow(row++,
+                new Label("Step size:"), timeStep,
+                new Label("Total time:"), simDuration);
+
+            // axis selectors - user picks what to plot on each axis
+            // "t" means plot against time, otherwise pick a variable
+            screen2.addRow(row++, new Label("--- Plot settings ---"));
+            ComboBox<String> plotXAxis = new ComboBox<>();
+            ComboBox<String> plotYAxis = new ComboBox<>();
+            plotXAxis.getItems().add("t");
+            for (int i = 0; i < numVars; i++) {
+                plotXAxis.getItems().add("var" + (i + 1));
+                plotYAxis.getItems().add("var" + (i + 1));
+            }
+            plotXAxis.setValue("t");
+            plotYAxis.setValue("var1");
+
+            screen2.addRow(row++,
+                new Label("X axis:"), plotXAxis,
+                new Label("Y axis:"), plotYAxis);
+
+            Button runButton = new Button("Run Simulation");
+            screen2.add(runButton, 0, row);
+
+            mainLayout.getChildren().addAll(screen2, theChart);
+
+            runButton.setOnAction(ev -> {
+                try {
+                    theChart.getData().clear();
+
+                    // collect variable names from the input fields
+                    String[] names = new String[numVars];
+                    for (int i = 0; i < numVars; i++) {
+                        names[i] = nameFields[i].getText().trim();
+                    }
+                    System.out.println("Variable names: " + java.util.Arrays.toString(names));
+
+                    // collect equation strings
+                    String[] equations = new String[numVars];
+                    for (int i = 0; i < numVars; i++) {
+                        equations[i] = equationFields[i].getText().trim();
+                    }
+                    System.out.println("Equations: " + java.util.Arrays.toString(equations));
+
+                    // parse constants from the text area
+                    // each line should look like "a=0.25"
+                    Map<String, Double> constants = new HashMap<>();
+                    for (String line : constantsArea.getText().split("\n")) {
+                        line = line.trim();
+                        if (line.contains("=")) {
+                            String[] parts = line.split("=");
+                            try {
+                                constants.put(parts[0].trim(),
+                                    Double.parseDouble(parts[1].trim()));
+                            } catch (NumberFormatException ex) {
+                                System.out.println("skipping bad constant line: " + line);
+                            }
+                        }
+                    }
+                    System.out.println("Constants: " + constants);
+
+                    // collect initial conditions
+                    double[] currentState = new double[numVars];
+                    for (int i = 0; i < numVars; i++) {
+                        currentState[i] = Double.parseDouble(initFields[i].getText().trim());
+                    }
+                    System.out.println("Initial state: " + java.util.Arrays.toString(currentState));
+
+                    double dt = Double.parseDouble(timeStep.getText().trim());
+                    double totalTime = Double.parseDouble(simDuration.getText().trim());
+                    System.out.println("dt=" + dt + ", totalTime=" + totalTime);
+
+                    // build the ODE system from the strings the user typed
+                    // this is what connects the GUI inputs to the solvers
+                    ODESystemBuilder ode = new ODESystemBuilder(equations, names, constants);
+
+                    // run the simulation loop
+                    // we store every state so we can plot the full trajectory afterwards
+                    // note: we clone() each state before storing because arrays are references,
+                    // without clone() every entry would just point to the final state
+                    List<double[]> allStates = new ArrayList<>();
+                    List<Double> allTimes = new ArrayList<>();
+                    double currentTime = 0;
+                    int stepCount = 0;
+
+                    while (currentTime <= totalTime) {
+                        allStates.add(currentState.clone());
+                        allTimes.add(currentTime);
+
+                        if (solverBox.getValue().equals("Euler")) {
+                            currentState = EulerSolver.step(currentState, dt, ode);
+                        } else {
+                            currentState = RungeKutta4.step(currentState, dt, ode);
+                        }
+                        currentTime += dt;
+                        stepCount++;
+                    }
+                    System.out.println("Simulation complete. Steps: " + stepCount + ", States collected: " + allStates.size());
+                    System.out.println("Final state: " + java.util.Arrays.toString(allStates.get(allStates.size()-1)));
+
+                    // pull out the two variables the user wants to see and plot them
+                    String xChoice = plotXAxis.getValue();
+                    String yChoice = plotYAxis.getValue();
+                    System.out.println("Plotting: X=" + xChoice + ", Y=" + yChoice);
+
+                    XYChart.Series<Number, Number> plotLine = new XYChart.Series<>();
+                    plotLine.setName(yChoice + " vs " + xChoice);
+
+                    for (int i = 0; i < allStates.size(); i++) {
+                        double[] snap = allStates.get(i);
+                        double t = allTimes.get(i);
+
+                        double xVal = getVal(xChoice, snap, t, names);
+                        double yVal = getVal(yChoice, snap, t, names);
+
+                        plotLine.getData().add(new XYChart.Data<>(xVal, yVal));
+                    }
+
+                    System.out.println("Plot points added: " + plotLine.getData().size());
+                    xAxisLabel.setLabel(xChoice);
+                    yAxisLabel.setLabel(yChoice);
+                    theChart.getData().add(plotLine);
+                    System.out.println("Chart updated successfully!");
+                    
+                    // Print results as a table
+                    System.out.println("\n" + "=".repeat(100));
+                    System.out.println("SIMULATION RESULTS");
+                    System.out.println("=".repeat(100));
+                    
+                    // Print header
+                    StringBuilder header = new StringBuilder();
+                    header.append(String.format("%-8s", "Time"));
+                    for (String name : names) {
+                        header.append(String.format("%-15s", name));
+                    }
+                    System.out.println(header);
+                    System.out.println("-".repeat(100));
+                    
+                    // Print every 10th state to avoid too much output
+                    int printInterval = Math.max(1, allStates.size() / 20);
+                    for (int i = 0; i < allStates.size(); i += printInterval) {
+                        StringBuilder rowBuilder = new StringBuilder();
+                        rowBuilder.append(String.format("%-8.4f", allTimes.get(i)));
+                        for (double val : allStates.get(i)) {
+                            rowBuilder.append(String.format("%-15.6f", val));
+                        }
+                        System.out.println(rowBuilder);
+                    }
+                    
+                    // Print final state
+                    if ((allStates.size() - 1) % printInterval != 0) {
+                        StringBuilder finalRowBuilder = new StringBuilder();
+                        finalRowBuilder.append(String.format("%-8.4f", allTimes.get(allStates.size() - 1)));
+                        for (double val : allStates.get(allStates.size() - 1)) {
+                            finalRowBuilder.append(String.format("%-15.6f", val));
+                        }
+                        System.out.println(finalRowBuilder);
+                    }
+                    
+                    System.out.println("=".repeat(100));
+                    System.out.println("FINAL STATE:");
+                    for (int i = 0; i < names.length; i++) {
+                        System.out.printf("  %s = %.6f%n", names[i], allStates.get(allStates.size() - 1)[i]);
+                    }
+                    System.out.println("=".repeat(100) + "\n");
+                    
+                    // Remove any existing evaluation panels before adding new one
+                    mainLayout.getChildren().removeIf(node -> node instanceof VBox && 
+                        ((VBox)node).getStyle().contains("-fx-border-color"));
+                    
+                    // Add evaluation section to the layout
+                    addEvaluationPanel(mainLayout, allStates, allTimes, names);
+                    
+                } catch (Exception ex) {
+                    System.err.println("ERROR during simulation: " + ex.getMessage());
+                    ex.printStackTrace();
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Error");
+                    alert.setContentText("Error: " + ex.getMessage());
+                    alert.showAndWait();
+                }
+            });
+        });
     }
 
-    // maps a variable name (like "z" or "vx") to its actual value in the state array
-    private double extractVariable(String varName, double[] state, double t) {
-        switch (varName) {
-            case "t":  return t;
-            case "x":  return state[0];
-            case "y":  return state[1];
-            case "z":  return state[2];
-            case "vx": return state[3];
-            case "vy": return state[4];
-            case "vz": return state[5];
+    // maps a variable name (like "var1", "x", or "t") to its value in the state array
+    // "t" returns current time, everything else is looked up by matching the names array
+    private double getVal(String name, double[] state, double t, String[] names) {
+        if (name.equals("t")) return t;
+        
+        // Try to match the variable name directly
+        for (int i = 0; i < names.length; i++) {
+            if (name.equals(names[i])) {
+                return state[i];
+            }
         }
-        return 0; //
+        
+        // Also try matching "var1", "var2", etc. format
+        for (int i = 0; i < names.length; i++) {
+            if (name.equals("var" + (i + 1))) {
+                return state[i];
+            }
+        }
+        
+        System.err.println("Warning: Variable '" + name + "' not found. Available: " + java.util.Arrays.toString(names));
+        return 0;
+    }
+    
+    // =========================================================================
+    // Add evaluation panel to query function values at specific times
+    // =========================================================================
+    private void addEvaluationPanel(VBox layout, List<double[]> allStates, List<Double> allTimes, String[] names) {
+        VBox evalPanel = new VBox(10);
+        evalPanel.setStyle("-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 15;");
+        
+        Label evalTitle = new Label("Evaluate at Specific Time");
+        evalTitle.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
+        
+        HBox inputBox = new HBox(10);
+        Label timeLabel = new Label("Time t =");
+        TextField timeField = new TextField("0.0");
+        timeField.setPrefWidth(100);
+        Button evalBtn = new Button("Evaluate");
+        TextArea resultArea = new TextArea();
+        resultArea.setPrefRowCount(8);
+        resultArea.setEditable(false);
+        resultArea.setStyle("-fx-font-family: 'Monospace'; -fx-font-size: 10;");
+        
+        inputBox.getChildren().addAll(timeLabel, timeField, evalBtn);
+        
+        evalBtn.setOnAction(e -> {
+            try {
+                double queryTime = Double.parseDouble(timeField.getText().trim());
+                
+                // Find the closest time in the simulation
+                int closestIdx = 0;
+                double minDiff = Math.abs(allTimes.get(0) - queryTime);
+                
+                for (int i = 0; i < allTimes.size(); i++) {
+                    double diff = Math.abs(allTimes.get(i) - queryTime);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestIdx = i;
+                    }
+                }
+                
+                double actualTime = allTimes.get(closestIdx);
+                double[] state = allStates.get(closestIdx);
+                
+                StringBuilder result = new StringBuilder();
+                result.append("TIME EVALUATION RESULT\n");
+                result.append("=".repeat(60)).append("\n");
+                result.append("Requested time: t = ").append(String.format("%.6f", queryTime)).append("\n");
+                result.append("Actual time:    t = ").append(String.format("%.6f", actualTime));
+                if (minDiff > 1e-6) {
+                    result.append(" (diff: ").append(String.format("%.8f", minDiff)).append(")");
+                }
+                result.append("\n").append("-".repeat(60)).append("\n");
+                
+                result.append("STATE VALUES:\n");
+                for (int i = 0; i < names.length; i++) {
+                    result.append(String.format("  %-20s = %15.10f%n", names[i], state[i]));
+                }
+                
+                result.append("\n-".repeat(60)).append("\n");
+                result.append("SIMULATION INFO:\n");
+                result.append(String.format("  Total states: %d%n", allStates.size()));
+                result.append(String.format("  Time range: [%.6f, %.6f]%n", allTimes.get(0), allTimes.get(allTimes.size()-1)));
+                result.append(String.format("  Sample rate: ~%.4f%n", allTimes.size() > 1 ? (allTimes.get(1) - allTimes.get(0)) : 0));
+                result.append("=".repeat(60)).append("\n");
+                
+                resultArea.setText(result.toString());
+                
+                // Also print to console
+                System.out.println("\n" + "=".repeat(70));
+                System.out.println("POINT EVALUATION AT t = " + String.format("%.6f", actualTime));
+                System.out.println("=".repeat(70));
+                System.out.println(result.toString());
+                System.out.println("=".repeat(70) + "\n");
+                
+            } catch (NumberFormatException ex) {
+                resultArea.setText("Error: Invalid time value. Please enter a number.");
+            }
+        });
+        
+        evalPanel.getChildren().addAll(evalTitle, inputBox, new Label("Result:"), resultArea);
+        layout.getChildren().add(evalPanel);
     }
 
     public static void main(String[] args) {

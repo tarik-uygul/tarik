@@ -1,107 +1,90 @@
 import java.util.Map;
 
-/**
- * Parses and evaluates a mathematical expression given as a String.
- *
- * Supports:
- *  - Basic arithmetic:  +  -  *  /
- *  - Parentheses for grouping
- *  - Math functions:    sin, cos, tan, sqrt, abs, exp, log
- *  - Unary minus:       e.g. -x or -(a+b)
- *  - Integer exponents: e.g. x^2  (positive integers only)
- *
- * Usage:
- *   ExpressionParser p = new ExpressionParser();
- *   double result = p.evaluate("a*x - b*x*y", names, state, constants);
- */
+// Takes a math equation written as a string and evaluates it into a number.
+// Basically a mini calculator that also handles variables and named constants.
+//
+// Supports:
+//   - Basic arithmetic: + - * /
+//   - Parentheses for grouping
+//   - Exponentiation: x^2
+//   - Unary minus: -x or -(a+b)
+//   - Math functions: sin, cos, tan, sqrt, abs, exp, log
 public class ExpressionParser {
 
-    /**
-     * Main entry point.
-     * Substitutes constants and variable values into the equation string,
-     * then evaluates the resulting numeric expression.
-     *
-     * @param equation  the equation string, e.g. "a*x - b*x*y"
-     * @param names     variable names matching the state array, e.g. {"x","y"}
-     * @param state     current values of those variables, e.g. {20.0, 2.0}
-     * @param constants named constants, e.g. {"a"->0.25, "b"->0.15}
-     * @return          the evaluated numeric result
-     */
-    public double evaluate(String equation,
-                           String[] names,
-                           double[] state,
-                           Map<String, Double> constants) {
+    public double evaluate(String equation, String[] names,
+                           double[] state, Map<String, Double> constants) {
 
-        // Work on a local copy so we never modify the caller's string
-        String expr = equation;
-
-        // 1. Substitute constants first.
-        //    Sort by key length DESCENDING so that longer names are replaced first.
-        //    e.g. "alpha" is replaced before "a", preventing "alpha" -> "a<number>lpha"
-        String[] constKeys = constants.keySet().toArray(new String[0]);
-        java.util.Arrays.sort(constKeys, (a, b) -> b.length() - a.length());
-        for (String key : constKeys) {
-            expr = expr.replace(key, Double.toString(constants.get(key)));
+        // step 1: replace constants using whole-word matching
+        // we use regex boundaries so that "t" doesn't accidentally replace
+        // the "t" inside "time" for example
+        // the pattern (?<![a-zA-Z0-9.]) means "not preceded by a letter/digit/dot"
+        // and (?![a-zA-Z0-9.]) means "not followed by a letter/digit/dot"
+        // this way only the standalone token gets replaced
+        // IMPORTANT: wrap replacements in parentheses to preserve order of operations
+        for (Map.Entry<String, Double> entry : constants.entrySet()) {
+            equation = equation.replaceAll(
+                "(?<![a-zA-Z0-9.])" + entry.getKey() + "(?![a-zA-Z0-9.])",
+                "(" + entry.getValue() + ")"
+            );
         }
 
-        // 2. Substitute variables - again longer names first.
-        //    e.g. {"vx","vy","x","y"}: replace "vx" before "x" so "vx" doesn't become
-        //    "<number>x" with a stray "x" left behind.
-        String[] sortedNames = names.clone();
-        java.util.Arrays.sort(sortedNames,
-                (a, b) -> b.length() - a.length()); // descending length
-
-        for (String sortedName : sortedNames) {
-            int stateIndex = indexOf(names, sortedName);
-            expr = expr.replace(sortedName, Double.toString(state[stateIndex]));
+        // step 2: replace variables using the same whole-word matching
+        // i is the same index for both names and state so the right value
+        // always gets substituted for the right variable name
+        // IMPORTANT: wrap replacements in parentheses to preserve order of operations
+        // e.g. "a*x + b*y" becomes "0.25*(1.0) + 0.15*(2.0)" not "0.25*1.0 + 0.15*2.0"
+        // this prevents issues like "x+0.15" becoming "1.0+0.15" which could be misparsed
+        for (int i = 0; i < names.length; i++) {
+            equation = equation.replaceAll(
+                "(?<![a-zA-Z0-9.])" + names[i] + "(?![a-zA-Z0-9.])",
+                "(" + state[i] + ")"
+            );
         }
 
-        // 3. Strip all spaces
-        expr = expr.replace(" ", "");
+        // step 3: remove all spaces
+        equation = equation.replace(" ", "");
 
-        // 4. Recursively evaluate
-        return calculate(expr);
+        // step 4: evaluate the resulting numeric string
+        return calculate(equation);
     }
 
     // -----------------------------------------------------------------------
-    // Helper: find index of a string in an array
-    // -----------------------------------------------------------------------
-    private int indexOf(String[] array, String target) {
-        for (int i = 0; i < array.length; i++) {
-            if (array[i].equals(target)) return i;
-        }
-        throw new IllegalArgumentException("Variable not found: " + target);
-    }
-
-    // -----------------------------------------------------------------------
-    // Core recursive evaluator
-    // Operator precedence (lowest to highest):
+    // Recursive evaluator
+    //
+    // Operator precedence, lowest to highest:
     //   1. + and -
     //   2. * and /
-    //   3. ^ (exponentiation)
-    //   4. unary minus, functions, parentheses, numbers
-    // We handle lowest precedence LAST by scanning right-to-left and splitting.
+    //   3. ^
+    //   4. unary minus, math functions, parentheses, plain numbers
+    //
+    // We handle the lowest-precedence operators LAST by scanning right-to-left
+    // and splitting the string there. Each half recurses into this same method.
+    //
+    // Example: "2*3+7"
+    //   - finds + at depth 0, splits into "2*3" and "7"
+    //   - "7" parses directly to 7.0
+    //   - "2*3" finds * at depth 0, splits into "2" and "3"
+    //   - both parse to 2.0 and 3.0, multiply to 6.0
+    //   - final result: 6.0 + 7.0 = 13.0
     // -----------------------------------------------------------------------
-    private double calculate(String expr) {
+    private double calculate(String equation) {
 
-        if (expr.isEmpty()) {
+        if (equation.isEmpty()) {
             throw new IllegalArgumentException("Empty expression");
         }
 
-        // ---- STEP 1: strip outer parentheses if the whole expr is wrapped ----
-        if (expr.charAt(0) == '(' && matchingParen(expr, 0) == expr.length() - 1) {
-            return calculate(expr.substring(1, expr.length() - 1));
-        }
-
-        // ---- STEP 2: handle named math functions ----
+        // ---- handle named math functions first ----
         // sin(...), cos(...), tan(...), sqrt(...), abs(...), exp(...), log(...)
+        // we check these before the operator scan so that "sin(x+1)" isn't
+        // misread as a variable name followed by an operator
         String[] funcs = {"sin", "cos", "tan", "sqrt", "abs", "exp", "log"};
         for (String fn : funcs) {
-            if (expr.startsWith(fn + "(") && expr.endsWith(")")) {
-                // make sure the closing ) belongs to this function call, not something inside
-                int openParen = fn.length(); // index of '('
-                if (matchingParen(expr, openParen) == expr.length() - 1) {
-                    double inner = calculate(expr.substring(openParen + 1, expr.length() - 1));
+            if (equation.startsWith(fn + "(") && equation.endsWith(")")) {
+                // make sure the closing ) belongs to THIS function call
+                // and not to something nested inside it
+                int openParen = fn.length();
+                if (matchingParen(equation, openParen) == equation.length() - 1) {
+                    double inner = calculate(equation.substring(openParen + 1, equation.length() - 1));
                     switch (fn) {
                         case "sin":  return Math.sin(inner);
                         case "cos":  return Math.cos(inner);
@@ -115,81 +98,82 @@ public class ExpressionParser {
             }
         }
 
-        // ---- STEP 3: find lowest-precedence operator (+/-) outside parentheses ----
-        // Scan RIGHT to LEFT so that left-associativity is preserved when we recurse.
-        // Bug fix from original: depth is reset to 0 before each scan pass.
+        // ---- handle + and - (lowest priority) ----
+        // scan right to left so left-associativity is preserved
+        // e.g. 5-3-1 splits at the rightmost - giving (5-3)-1 = 1, not 5-(3-1) = 3
+        // depth tracking: going right-to-left, ) opens a group and ( closes one
+        // we only split on operators that are outside all brackets (depth == 0)
         int depth = 0;
-        for (int i = expr.length() - 1; i >= 0; i--) {
-            char c = expr.charAt(i);
+        for (int i = equation.length() - 1; i >= 0; i--) {
+            char c = equation.charAt(i);
             if (c == ')') depth++;
             if (c == '(') depth--;
-            // only split on + or - that are:
-            //   - at depth 0 (not inside parentheses)
-            //   - not at position 0 (that would be a unary operator, handled below)
-            //   - preceded by a digit or closing paren (so we know it's binary, not unary)
-            if (depth == 0 && i > 0 && (c == '+' || c == '-')) {
-                char prev = expr.charAt(i - 1);
-                // Binary + or - must follow a number or closing paren
-                // If it follows an operator or opening paren, it's unary
+            if (depth == 0 && (c == '+' || c == '-') && i > 0) {
+                // make sure this is a binary operator, not a unary minus
+                // a binary + or - must be preceded by a digit or closing paren
+                char prev = equation.charAt(i - 1);
                 if (Character.isDigit(prev) || prev == ')') {
-                    double left  = calculate(expr.substring(0, i));
-                    double right = calculate(expr.substring(i + 1));
+                    double left  = calculate(equation.substring(0, i));
+                    double right = calculate(equation.substring(i + 1));
                     return c == '+' ? left + right : left - right;
                 }
             }
         }
 
-        // ---- STEP 4: find * or / outside parentheses ----
-        depth = 0; // RESET - this was the bug in the original code
-        for (int i = expr.length() - 1; i >= 0; i--) {
-            char c = expr.charAt(i);
+        // ---- handle * and / (medium priority) ----
+        depth = 0; // reset - forgetting this was the original bug
+        for (int i = equation.length() - 1; i >= 0; i--) {
+            char c = equation.charAt(i);
             if (c == ')') depth++;
             if (c == '(') depth--;
-            if (depth == 0 && i > 0 && (c == '*' || c == '/')) {
-                // Safety check: ensure right side is non-empty
-                if (i < expr.length() - 1) {
-                    double left  = calculate(expr.substring(0, i));
-                    double right = calculate(expr.substring(i + 1));
-                    return c == '*' ? left * right : left / right;
-                }
+            if (depth == 0 && (c == '*' || c == '/') && i > 0) {
+                double left  = calculate(equation.substring(0, i));
+                double right = calculate(equation.substring(i + 1));
+                return c == '*' ? left * right : left / right;
             }
         }
 
-        // ---- STEP 5: handle ^ (exponentiation) ----
-        depth = 0; // RESET
-        for (int i = expr.length() - 1; i >= 0; i--) {
-            char c = expr.charAt(i);
-            if (c == ')') depth++;
-            if (c == '(') depth--;
+        // ---- handle ^ exponentiation ----
+        // scan left to right so that 2^3^2 = 2^(3^2) = 512
+        // which is the standard mathematical convention (right-associative)
+        depth = 0; // reset
+        for (int i = 0; i < equation.length(); i++) {
+            char c = equation.charAt(i);
+            if (c == '(') depth++;
+            if (c == ')') depth--;
             if (depth == 0 && c == '^' && i > 0) {
-                // Safety check: ensure right side is non-empty
-                if (i < expr.length() - 1) {
-                    double base     = calculate(expr.substring(0, i));
-                    double exponent = calculate(expr.substring(i + 1));
-                    return Math.pow(base, exponent);
-                }
+                double base     = calculate(equation.substring(0, i));
+                double exponent = calculate(equation.substring(i + 1));
+                return Math.pow(base, exponent);
             }
         }
 
-        // ---- STEP 6: handle unary minus, e.g. -x or -(a+b) ----
-        if (expr.charAt(0) == '-') {
-            return -calculate(expr.substring(1));
+        // ---- strip outer parentheses ----
+        // e.g. (2+3) becomes 2+3 and recurses normally
+        if (equation.charAt(0) == '(' && equation.endsWith(")")) {
+            if (matchingParen(equation, 0) == equation.length() - 1) {
+                return calculate(equation.substring(1, equation.length() - 1));
+            }
         }
 
-        // ---- STEP 7: base case - must be a plain number ----
+        // ---- handle unary minus ----
+        // e.g. -x or -(a+b)
+        // only reached here if no binary operator was found above
+        if (equation.charAt(0) == '-') {
+            return -calculate(equation.substring(1));
+        }
+
+        // ---- base case: plain number ----
         try {
-            return Double.parseDouble(expr);
+            return Double.parseDouble(equation);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(
-                "Cannot parse token: '" + expr + "' — check your equation string for typos.");
+                "Cannot parse: '" + equation + "' - check your equation for typos. " +
+                "Math functions require parentheses: sin(x), cos(x), sqrt(x), abs(x), exp(x), log(x)");
         }
     }
 
-    /**
-     * Given an expression and the index of an opening '(',
-     * returns the index of its matching closing ')'.
-     * Throws if parentheses are unbalanced.
-     */
+    // finds the closing ) that matches the ( at openIndex
     private int matchingParen(String expr, int openIndex) {
         int depth = 0;
         for (int i = openIndex; i < expr.length(); i++) {
@@ -197,7 +181,6 @@ public class ExpressionParser {
             if (expr.charAt(i) == ')') depth--;
             if (depth == 0) return i;
         }
-        throw new IllegalArgumentException(
-            "Unbalanced parentheses in: " + expr);
+        throw new IllegalArgumentException("Unbalanced parentheses in: " + expr);
     }
 }

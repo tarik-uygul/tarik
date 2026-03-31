@@ -36,6 +36,7 @@ import java.util.Map;
  *   javac LogLogPlot.java
  *   java  LogLogPlot
  */
+
 public class LogLogPlot extends Application {
 
     // -----------------------------------------------------------------------

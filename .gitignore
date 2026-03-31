@@ -1,0 +1,34 @@
+# Compiled Java classes
+bin/
+*.class
+
+# JSON files
+*.json
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Build artifacts
+target/
+*.o
+*.so
+*.dylib
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/

@@ -1,3 +1,4 @@
+package everything;
 
 // so this is basically just a "blueprint" for what a physics function should look like
 // to call SOMETHING to get the derivatives, but they dont know what system we are simulating

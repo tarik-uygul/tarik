@@ -1,3 +1,5 @@
+package everything;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -8,7 +10,7 @@ public class FakeGUI {
         // fake GUI inputs - these will come from real GUI input boxes later
         String[] names = {"x", "y"};
         String[] equations = {"a*x - b*x*y", "d*x*y - g*y"};
-        
+
         Map<String, Double> constants = new HashMap<>();
         constants.put("a", 0.25);
         constants.put("b", 0.15);

@@ -1,3 +1,4 @@
+package everything;
 
 
 // euler was simple but it only looks at the derivative at the START of the step
@@ -7,10 +8,10 @@
 // and then doing a weighted average of all four samples
 // and average all those together
 
-// the four samples are called k1 k2 k3 k4 
+// the four samples are called k1 k2 k3 k4
 // k1 = derivative at the very start of the step, using current state
 // k2 = derivative at the midpoint, but we used k1 to estimate where midpoint is
-// k3 = derivative at the midpoint AGAIN but this time we use k2 to estimate it 
+// k3 = derivative at the midpoint AGAIN but this time we use k2 to estimate it
 // k4 = derivative at the end of the step, using k3 to estimate where the end is
 
 // then the final answer weights them as: (k1 + 2*k2 + 2*k3 + k4) / 6

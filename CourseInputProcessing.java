@@ -1,3 +1,5 @@
+package everything;
+
 import java.util.Map;
 
 /**
@@ -20,10 +22,10 @@ public class CourseInputProcessing {
     private static final Map<String, Double> noConstants = Map.of();
 
     public CourseConfiguration buildConfig(String heightExpr,
-                                    String muKStr, String muSStr,
-                                    String startXStr, String startYStr,
-                                    String targetXStr, String targetYStr,
-                                    String radiusStr, String stepSizeStr) {
+                                           String muKStr, String muSStr,
+                                           String startXStr, String startYStr,
+                                           String targetXStr, String targetYStr,
+                                           String radiusStr, String stepSizeStr) {
 
         double muK = parsePositive(muKStr, "µK");
         double muS = parsePositive(muSStr, "µS");

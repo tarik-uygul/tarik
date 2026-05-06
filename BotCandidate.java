@@ -1,4 +1,4 @@
-package everything;
+package bots;
 
 public class BotCandidate {
     public final double vx;
@@ -9,7 +9,6 @@ public class BotCandidate {
         this.vx = vx;
         this.vy = vy;
         this.score = score;
-
 
     }
 }

@@ -1,4 +1,4 @@
-package everything;
+package model;
 
 /**
  * All the containers we need I think
@@ -16,8 +16,8 @@ public class CourseConfiguration {
     public double stepSize;
 
     public CourseConfiguration(HeightFunction heightFunction, double muK, double muS, double startX, double startY,
-                               double targetX, double targetY, double targetRadius,
-                               double stepSize) {
+            double targetX, double targetY, double targetRadius,
+            double stepSize) {
         this.heightFunction = heightFunction;
         this.muK = muK;
         this.muS = muS;
@@ -26,6 +26,6 @@ public class CourseConfiguration {
         this.targetX = targetX;
         this.targetY = targetY;
         this.targetRadius = targetRadius;
-        this.stepSize = stepSize;
+        this.stepSize = stepSize; 
     }
 }

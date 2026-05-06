@@ -1,12 +1,13 @@
-package everything;
+package model;
 
 import java.util.Map;
+
+import physics.ExpressionParser;
 
 /**
  * Represents the terrain height z = h(x, y)
  * Built from a user-provided expression string through CourseInputProcessor
  */
-
 public class HeightFunction {
 
     private final String expression;

@@ -1,26 +1,29 @@
-package everything;
+package physics;
+
+import io.CourseInputModuleStorage;
+import model.CourseProfile;
 
 // implements the equations of motion from Appendix B of the manual
 // state vector is [x, y, vx, vy]
 public class GolfPhysicsFunction implements ODEFunction {
 
     private static final double G = 9.81;
-    private final CourseProfile course;
+    private final CourseInputModuleStorage course;
 
-    public GolfPhysicsFunction(CourseProfile course) {
+    public GolfPhysicsFunction(CourseInputModuleStorage course) {
         this.course = course;
     }
 
     @Override
     public double[] compute(double[] state) {
-        double x  = state[0];
-        double y  = state[1];
+        double x = state[0];
+        double y = state[1];
         double vx = state[2];
         double vy = state[3];
 
         double dhdx = course.getSlopeX(x, y);
         double dhdy = course.getSlopeY(x, y);
-        double muK  = course.getKineticFriction();
+        double muK = course.getKineticFriction();
         double speed = Math.sqrt(vx * vx + vy * vy);
 
         double ax, ay;
@@ -46,6 +49,6 @@ public class GolfPhysicsFunction implements ODEFunction {
         }
 
         // [dx/dt, dy/dt, dvx/dt, dvy/dt]
-        return new double[]{vx, vy, ax, ay};
+        return new double[] { vx, vy, ax, ay };
     }
 }

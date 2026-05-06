@@ -1,6 +1,12 @@
-package everything;
+package ui;
 
 import javax.swing.*;
+
+import physics.EulerSolver;
+import physics.ODEFunction;
+import physics.ODESystemBuilder;
+import physics.RungeKutta4;
+
 import java.awt.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -15,21 +21,23 @@ import java.util.Map;
  * - RungeKutta4
  *
  * What it does:
- * - Lets the user type variable names, equations, constants, initial state, dt, steps
+ * - Lets the user type variable names, equations, constants, initial state, dt,
+ * steps
  * - Lets the user choose Euler or RK4
  * - Simulates the system
  * - Draws the trajectory of the first two variables
  *
  * Example input:
- * names:      x,v
- * equations:  v,-x
+ * names: x,v
+ * equations: v,-x
  * constants:
- * initial:    1,0
- * dt:         0.05
- * steps:      400
- * solver:     RK4
+ * initial: 1,0
+ * dt: 0.05
+ * steps: 400
+ * solver: RK4
  *
- * This example plots x against v, which gives the phase portrait of a harmonic oscillator.
+ * This example plots x against v, which gives the phase portrait of a harmonic
+ * oscillator.
  */
 public class SmallODEVisualizer extends JFrame {
 
@@ -39,7 +47,7 @@ public class SmallODEVisualizer extends JFrame {
     private final JTextField initialStateField = new JTextField("1,0");
     private final JTextField dtField = new JTextField("0.05");
     private final JTextField stepsField = new JTextField("400");
-    private final JComboBox<String> solverBox = new JComboBox<>(new String[]{"RK4", "Euler"});
+    private final JComboBox<String> solverBox = new JComboBox<>(new String[] { "RK4", "Euler" });
     private final JLabel statusLabel = new JLabel("Enter values and press Run.");
 
     private final PlotPanel plotPanel = new PlotPanel();
@@ -115,7 +123,7 @@ public class SmallODEVisualizer extends JFrame {
     }
 
     private void addRow(JPanel panel, GridBagConstraints gbc, int row,
-                        String labelText, JTextField field, String hint) {
+            String labelText, JTextField field, String hint) {
         gbc.gridx = 0;
         gbc.gridy = row;
         gbc.weightx = 0;
@@ -161,7 +169,8 @@ public class SmallODEVisualizer extends JFrame {
             ODESystemBuilder ode = new ODESystemBuilder(equations, names, constants);
             double[][] points = simulate(ode, initialState, dt, steps, solver);
             plotPanel.setData(points, names[0], names[1]);
-            statusLabel.setText("Done. Showing trajectory of " + names[0] + " vs " + names[1] + " using " + solver.toUpperCase() + ".");
+            statusLabel.setText("Done. Showing trajectory of " + names[0] + " vs " + names[1] + " using "
+                    + solver.toUpperCase() + ".");
         } catch (Exception ex) {
             statusLabel.setText("Error: " + ex.getMessage());
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Input Error", JOptionPane.ERROR_MESSAGE);
@@ -213,7 +222,8 @@ public class SmallODEVisualizer extends JFrame {
         String[] pairs = text.split(",");
         for (String pair : pairs) {
             String trimmed = pair.trim();
-            if (trimmed.isEmpty()) continue;
+            if (trimmed.isEmpty())
+                continue;
 
             String[] sides = trimmed.split("=");
             if (sides.length != 2) {
@@ -341,4 +351,3 @@ public class SmallODEVisualizer extends JFrame {
         SwingUtilities.invokeLater(() -> new SmallODEVisualizer().setVisible(true));
     }
 }
-

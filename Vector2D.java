@@ -1,3 +1,5 @@
+package model;
+
 public class Vector2D {
     public final double x;
     public final double y;

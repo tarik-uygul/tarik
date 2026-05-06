@@ -1,10 +1,15 @@
-package everything;
+package ui;
+
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.chart.*;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
+import physics.EulerSolver;
+import physics.ODESystemBuilder;
+import physics.RungeKutta4;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -213,9 +218,11 @@ public class Visualizer extends Application {
 
     // extracts value by var name like "var1", "var2", or "t"
     private double getVal(String name, double[] state, double t, int numVars) {
-        if (name.equals("t")) return t;
+        if (name.equals("t"))
+            return t;
         for (int i = 0; i < numVars; i++) {
-            if (name.equals("var" + (i + 1))) return state[i];
+            if (name.equals("var" + (i + 1)))
+                return state[i];
         }
         return 0;
     }
@@ -224,4 +231,3 @@ public class Visualizer extends Application {
         launch(args);
     }
 }
-

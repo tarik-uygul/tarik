@@ -1,5 +1,4 @@
-package everything;
-
+package src.test;
 
 import javafx.application.Application;
 import javafx.geometry.Insets;
@@ -13,6 +12,10 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import physics.EulerSolver;
+import physics.ODEFunction;
+import physics.ODESystemBuilder;
+import physics.RungeKutta4;
 
 import java.util.HashMap;
 
@@ -35,8 +38,8 @@ public class LogLogPlot extends Application {
     // -----------------------------------------------------------------------
     // Experiment settings
     // -----------------------------------------------------------------------
-    private static final double END_TIME  = 20.0;
-    private static final int    TIME_REPS = 5;
+    private static final double END_TIME = 20.0;
+    private static final int TIME_REPS = 5;
 
     private static final double[] STEP_SIZES = {
             1.0, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001
@@ -45,15 +48,15 @@ public class LogLogPlot extends Application {
     // -----------------------------------------------------------------------
     // Colour scheme
     // -----------------------------------------------------------------------
-    private static final Color BG_COLOR       = Color.web("#1e1e2e");
-    private static final Color PANEL_COLOR     = Color.web("#2a2a3e");
-    private static final Color GRID_COLOR      = Color.web("#3a3a5a");
-    private static final Color AXIS_COLOR      = Color.web("#888888");
-    private static final Color EULER_COLOR     = Color.web("#ff6b6b");
-    private static final Color RK4_COLOR       = Color.web("#4ecdc4");
+    private static final Color BG_COLOR = Color.web("#1e1e2e");
+    private static final Color PANEL_COLOR = Color.web("#2a2a3e");
+    private static final Color GRID_COLOR = Color.web("#3a3a5a");
+    private static final Color AXIS_COLOR = Color.web("#888888");
+    private static final Color EULER_COLOR = Color.web("#ff6b6b");
+    private static final Color RK4_COLOR = Color.web("#4ecdc4");
     private static final Color REFERENCE_COLOR = Color.web("#ffd93d");
-    private static final Color TEXT_COLOR      = Color.web("#e0e0f0");
-    private static final Color TITLE_COLOR     = Color.web("#ffffff");
+    private static final Color TEXT_COLOR = Color.web("#e0e0f0");
+    private static final Color TITLE_COLOR = Color.web("#ffffff");
 
     // -----------------------------------------------------------------------
     // JavaFX entry point
@@ -77,7 +80,7 @@ public class LogLogPlot extends Application {
         plots.setAlignment(Pos.CENTER);
 
         Canvas errorCanvas = new Canvas(560, 430);
-        Canvas timeCanvas  = new Canvas(560, 430);
+        Canvas timeCanvas = new Canvas(560, 430);
 
         drawLogLogPlot(errorCanvas,
                 "Accuracy vs Step Size",
@@ -122,19 +125,20 @@ public class LogLogPlot extends Application {
     // -----------------------------------------------------------------------
     private ExperimentData runExperiment() {
 
-        // harmonic oscillator: x' = v,  v' = -1*x
-        // written as strings so they go through ExpressionParser just like in the Visualizer
-        String[] names = {"x", "v"};
-        String[] eqs   = {"v", "-1*x"};
+        // harmonic oscillator: x' = v, v' = -1*x
+        // written as strings so they go through ExpressionParser just like in the
+        // Visualizer
+        String[] names = { "x", "v" };
+        String[] eqs = { "v", "-1*x" };
         ODESystemBuilder ode = new ODESystemBuilder(eqs, names, new HashMap<>());
 
-        double[] initialState = {1.0, 0.0};  // x(0)=1, v(0)=0
+        double[] initialState = { 1.0, 0.0 }; // x(0)=1, v(0)=0
 
         int n = STEP_SIZES.length;
         double[] eulerErrors = new double[n];
-        double[] rk4Errors   = new double[n];
-        double[] eulerTimes  = new double[n];
-        double[] rk4Times    = new double[n];
+        double[] rk4Errors = new double[n];
+        double[] eulerTimes = new double[n];
+        double[] rk4Times = new double[n];
 
         for (int i = 0; i < n; i++) {
             double h = STEP_SIZES[i];
@@ -147,7 +151,7 @@ public class LogLogPlot extends Application {
                 eulerResult = integrate(initialState, h, END_TIME, ode, "euler");
                 totalTime += System.nanoTime() - t0;
             }
-            eulerTimes[i]  = totalTime / (double) TIME_REPS;
+            eulerTimes[i] = totalTime / (double) TIME_REPS;
             eulerErrors[i] = euclideanError(eulerResult, exactSolution(END_TIME));
 
             // RK4 - same timing approach
@@ -158,7 +162,7 @@ public class LogLogPlot extends Application {
                 rk4Result = integrate(initialState, h, END_TIME, ode, "rk4");
                 totalTime += System.nanoTime() - t0;
             }
-            rk4Times[i]  = totalTime / (double) TIME_REPS;
+            rk4Times[i] = totalTime / (double) TIME_REPS;
             rk4Errors[i] = euclideanError(rk4Result, exactSolution(END_TIME));
 
             System.out.printf("h=%.4f  eulerErr=%.3e  rk4Err=%.3e  eulerTime=%dns  rk4Time=%dns%n",
@@ -174,7 +178,7 @@ public class LogLogPlot extends Application {
     // calls EulerSolver.step or RungeKutta4.step - both take the same arguments
     // -----------------------------------------------------------------------
     private double[] integrate(double[] initialState, double h,
-                               double endTime, ODEFunction ode, String solver) {
+            double endTime, ODEFunction ode, String solver) {
         double[] state = initialState.clone();
         double t = 0.0;
         while (t + h <= endTime + 1e-12) {
@@ -190,7 +194,7 @@ public class LogLogPlot extends Application {
 
     // exact solution of the harmonic oscillator x''=-x at time t
     private double[] exactSolution(double t) {
-        return new double[]{Math.cos(t), -Math.sin(t)};
+        return new double[] { Math.cos(t), -Math.sin(t) };
     }
 
     private double euclideanError(double[] numerical, double[] exact) {
@@ -206,34 +210,34 @@ public class LogLogPlot extends Application {
     // Drawing - unchanged from original, just draws the plots onto canvases
     // -----------------------------------------------------------------------
     private void drawLogLogPlot(Canvas canvas,
-                                String plotTitle,
-                                String xLabel,
-                                String yLabel,
-                                double[] xs,
-                                double[] ys1,
-                                double[] ys2,
-                                boolean drawSlopeLines) {
+            String plotTitle,
+            String xLabel,
+            String yLabel,
+            double[] xs,
+            double[] ys1,
+            double[] ys2,
+            boolean drawSlopeLines) {
 
         GraphicsContext gc = canvas.getGraphicsContext2D();
         double W = canvas.getWidth();
         double H = canvas.getHeight();
 
-        double marginLeft   = 70;
-        double marginRight  = 30;
-        double marginTop    = 50;
+        double marginLeft = 70;
+        double marginRight = 30;
+        double marginTop = 50;
         double marginBottom = 60;
         double plotW = W - marginLeft - marginRight;
-        double plotH = H - marginTop  - marginBottom;
+        double plotH = H - marginTop - marginBottom;
 
         gc.setFill(PANEL_COLOR);
         gc.fillRoundRect(0, 0, W, H, 16, 16);
 
-        double[] logXs  = log10Array(xs);
+        double[] logXs = log10Array(xs);
         double[] logYs1 = log10Array(ys1);
         double[] logYs2 = log10Array(ys2);
 
-        double xMin = min(logXs)  - 0.2;
-        double xMax = max(logXs)  + 0.2;
+        double xMin = min(logXs) - 0.2;
+        double xMax = max(logXs) + 0.2;
         double yMin = Math.min(min(logYs1), min(logYs2)) - 0.5;
         double yMax = Math.max(max(logYs1), max(logYs2)) + 0.5;
 
@@ -282,9 +286,9 @@ public class LogLogPlot extends Application {
         }
 
         drawDataLine(gc, logXs, logYs1, EULER_COLOR, xMin, xMax, yMin, yMax, marginLeft, marginTop, plotW, plotH);
-        drawDataLine(gc, logXs, logYs2, RK4_COLOR,   xMin, xMax, yMin, yMax, marginLeft, marginTop, plotW, plotH);
+        drawDataLine(gc, logXs, logYs2, RK4_COLOR, xMin, xMax, yMin, yMax, marginLeft, marginTop, plotW, plotH);
         drawDataPoints(gc, logXs, logYs1, EULER_COLOR, xMin, xMax, yMin, yMax, marginLeft, marginTop, plotW, plotH);
-        drawDataPoints(gc, logXs, logYs2, RK4_COLOR,   xMin, xMax, yMin, yMax, marginLeft, marginTop, plotW, plotH);
+        drawDataPoints(gc, logXs, logYs2, RK4_COLOR, xMin, xMax, yMin, yMax, marginLeft, marginTop, plotW, plotH);
 
         gc.setFill(TITLE_COLOR);
         gc.setFont(Font.font("Monospace", FontWeight.BOLD, 13));
@@ -302,9 +306,9 @@ public class LogLogPlot extends Application {
     }
 
     private void drawReferenceLine(GraphicsContext gc, String label,
-                                   double xMin, double xMax, double yMin, double yMax,
-                                   double marginLeft, double marginTop, double plotW, double plotH,
-                                   double slope, double x0, double y0) {
+            double xMin, double xMax, double yMin, double yMax,
+            double marginLeft, double marginTop, double plotW, double plotH,
+            double slope, double x0, double y0) {
         gc.setStroke(REFERENCE_COLOR);
         gc.setLineWidth(1.0);
         gc.setLineDashes(6, 4);
@@ -320,23 +324,25 @@ public class LogLogPlot extends Application {
     }
 
     private void drawDataLine(GraphicsContext gc, double[] logXs, double[] logYs, Color color,
-                              double xMin, double xMax, double yMin, double yMax,
-                              double marginLeft, double marginTop, double plotW, double plotH) {
+            double xMin, double xMax, double yMin, double yMax,
+            double marginLeft, double marginTop, double plotW, double plotH) {
         gc.setStroke(color);
         gc.setLineWidth(2.5);
         gc.beginPath();
         for (int i = 0; i < logXs.length; i++) {
             double px = toPixelX(logXs[i], xMin, xMax, marginLeft, plotW);
             double py = toPixelY(logYs[i], yMin, yMax, marginTop, plotH);
-            if (i == 0) gc.moveTo(px, py);
-            else        gc.lineTo(px, py);
+            if (i == 0)
+                gc.moveTo(px, py);
+            else
+                gc.lineTo(px, py);
         }
         gc.stroke();
     }
 
     private void drawDataPoints(GraphicsContext gc, double[] logXs, double[] logYs, Color color,
-                                double xMin, double xMax, double yMin, double yMax,
-                                double marginLeft, double marginTop, double plotW, double plotH) {
+            double xMin, double xMax, double yMin, double yMax,
+            double marginLeft, double marginTop, double plotW, double plotH) {
         double r = 5;
         gc.setFill(color);
         gc.setStroke(PANEL_COLOR);
@@ -353,10 +359,9 @@ public class LogLogPlot extends Application {
         HBox legend = new HBox(32);
         legend.setAlignment(Pos.CENTER);
         legend.getChildren().addAll(
-                legendEntry(EULER_COLOR,     "— Euler (1st order)"),
-                legendEntry(RK4_COLOR,       "— RK4 (4th order)"),
-                legendEntry(REFERENCE_COLOR, "- - Reference slope")
-        );
+                legendEntry(EULER_COLOR, "— Euler (1st order)"),
+                legendEntry(RK4_COLOR, "— RK4 (4th order)"),
+                legendEntry(REFERENCE_COLOR, "- - Reference slope"));
         return legend;
     }
 
@@ -390,37 +395,45 @@ public class LogLogPlot extends Application {
 
     private double min(double[] arr) {
         double m = arr[0];
-        for (double v : arr) if (v < m) m = v;
+        for (double v : arr)
+            if (v < m)
+                m = v;
         return m;
     }
 
     private double max(double[] arr) {
         double m = arr[0];
-        for (double v : arr) if (v > m) m = v;
+        for (double v : arr)
+            if (v > m)
+                m = v;
         return m;
     }
 
     private String superscript(int n) {
-        String[] sup = {"⁰","¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹"};
+        String[] sup = { "⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹" };
         String s = "";
-        if (n < 0) { s = "⁻"; n = -n; }
-        for (char c : String.valueOf(n).toCharArray()) s += sup[c - '0'];
+        if (n < 0) {
+            s = "⁻";
+            n = -n;
+        }
+        for (char c : String.valueOf(n).toCharArray())
+            s += sup[c - '0'];
         return s;
     }
 
     private static class ExperimentData {
         final double[] stepSizes;
         final double[] eulerErrors, rk4Errors;
-        final double[] eulerTimes,  rk4Times;
+        final double[] eulerTimes, rk4Times;
 
         ExperimentData(double[] stepSizes,
-                       double[] eulerErrors, double[] rk4Errors,
-                       double[] eulerTimes,  double[] rk4Times) {
-            this.stepSizes   = stepSizes;
+                double[] eulerErrors, double[] rk4Errors,
+                double[] eulerTimes, double[] rk4Times) {
+            this.stepSizes = stepSizes;
             this.eulerErrors = eulerErrors;
-            this.rk4Errors   = rk4Errors;
-            this.eulerTimes  = eulerTimes;
-            this.rk4Times    = rk4Times;
+            this.rk4Errors = rk4Errors;
+            this.eulerTimes = eulerTimes;
+            this.rk4Times = rk4Times;
         }
     }
 
@@ -428,5 +441,3 @@ public class LogLogPlot extends Application {
         launch(args);
     }
 }
-
-

@@ -1,5 +1,4 @@
-package everything;
-
+package physics;
 
 // euler was simple but it only looks at the derivative at the START of the step
 // which is a problem because the derivative is changing the whole time during the step
@@ -18,13 +17,13 @@ package everything;
 // the middle samples (k2 and k3) get double weight because theyre more representative
 // of whats happening in the MIDDLE of the interval which matters more than just the endpoints
 
-
-
 public class RungeKutta4 {
 
     // same signature as euler - currentState, time step size, physics function
-    // this is on purpose, the visualizer can swap between solvers without changing anything else
-    // both solvers take the same inputs and return the same thing but with different accuracy
+    // this is on purpose, the visualizer can swap between solvers without changing
+    // anything else
+    // both solvers take the same inputs and return the same thing but with
+    // different accuracy
     public static double[] step(double[] currentState, double dt, ODEFunction physicsFunc) {
 
         // sample 1: derivative right at the start
@@ -52,9 +51,10 @@ public class RungeKutta4 {
         // k1 and k4 (the endpoints) each count once
         // k2 and k3 (the midpoints) each count twice
         // divide by 6 total (1 + 2 + 2 + 1 = 6) to get the average
-        // this weighted average is way more accurate than just using k1 alone (which is euler)
+        // this weighted average is way more accurate than just using k1 alone (which is
+        // euler)
         for (int idx = 0; idx < currentState.length; idx++) {
-            nextState[idx] = currentState[idx] + (dt / 6.0) * (k1[idx] + 2*k2[idx] + 2*k3[idx] + k4[idx]);
+            nextState[idx] = currentState[idx] + (dt / 6.0) * (k1[idx] + 2 * k2[idx] + 2 * k3[idx] + k4[idx]);
         }
 
         return nextState;
@@ -63,7 +63,8 @@ public class RungeKutta4 {
     // little helper function to avoid repeating ourselves
     // computes: baseState + scaleFactor * derivative
     // this is how we "project" the state forward by some fraction of a step
-    // without this wed have to write the same loop four times up above which would be messy
+    // without this wed have to write the same loop four times up above which would
+    // be messy
     private static double[] addScaled(double[] baseState, double[] derivative, double scaleFactor) {
         double[] result = new double[baseState.length];
         for (int idx = 0; idx < baseState.length; idx++) {
